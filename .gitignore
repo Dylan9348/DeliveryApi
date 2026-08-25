@@ -1,0 +1,12 @@
+
+.env
+
+obj/
+bin/
+Properties/
+
+postman/
+.postman/
+.vscode/
+
+appsettings.Development.json
