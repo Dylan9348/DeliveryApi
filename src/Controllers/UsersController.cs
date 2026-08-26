@@ -1,73 +1,21 @@
 
 using System.IdentityModel.Tokens.Jwt;
-using System.Security.Claims;
-using System.Text;
-using DeliveryApi.DataBase;
-using DeliveryApi.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.IdentityModel.Tokens;
+
+using DeliveryApi.DataBase;
+using DeliveryApi.Models;
+using DeliveryApi.Services;
 
 namespace DeliveryApi.Controllers;
 
 [ApiController]
 [Route("users")]
-public class UsersController(Context database) : Controller
+public class UsersController(Context database, ITokenService tokenService) : Controller
 {
     private readonly Context _database = database;
-    
-    private static string GenerateJwtToken(UserModel user)
-    {
-        var claims = new[]
-        {
-            new Claim(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
-            new Claim("username", user.Username),
-            new Claim("role", user.Role.ToString()),
-            new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
-        };
-
-        var secretKey = Environment.GetEnvironmentVariable("KEY_TOKEN_GEN") ?? throw new InvalidOperationException("KEY_TOKEN_GEN no está configurada");
-        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secretKey));
-        var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
-
-        var token = new JwtSecurityToken(
-            issuer: "delivery-api",
-            audience: "clients",
-            claims: claims,
-            expires: DateTime.UtcNow.AddHours(1),
-            signingCredentials: creds
-        );
-
-        return new JwtSecurityTokenHandler().WriteToken(token);
-    }
-
-    private string GenerateRefreshToken()
-    {
-        var bytes = new byte[32];
-        System.Security.Cryptography.RandomNumberGenerator.Fill(bytes);
-        return Convert.ToBase64String(bytes);
-    }
-
-    private async Task SetRefreshTokenCookie(string refreshToken, string username)
-    {
-        var token = new RefreshToken()
-        {
-            Token = refreshToken,
-            UsernameTarget = username
-        };
-
-        Response.Cookies.Append("refreshToken", refreshToken, new CookieOptions
-        {
-            HttpOnly = true,
-            Secure = true,
-            SameSite = SameSiteMode.Strict,
-            Expires = DateTime.UtcNow.AddDays(15)
-        });
-
-        _database.RefreshTokens.Add(token);
-        await _database.SaveChangesAsync();
-    }
+    private readonly ITokenService _tokenService = tokenService;
 
     [HttpPost("register")]
     public async Task<IActionResult> Register(UserReq req)
@@ -110,11 +58,11 @@ public class UsersController(Context database) : Controller
 
         if (!isPasswordCorrect)
             return Unauthorized();
+    
+        var token = _tokenService.GenerateJwtToken(user);
+        var refreshToken = _tokenService.GenerateRefreshToken();
 
-        var token = GenerateJwtToken(user);
-        var refreshToken = GenerateRefreshToken();
-
-        await SetRefreshTokenCookie(refreshToken, user.Username);
+        await _tokenService.SetRefreshTokenAsync(refreshToken, user.Username);
 
         return Ok(token);
     }
@@ -146,12 +94,12 @@ public class UsersController(Context database) : Controller
             return Jwt and a new Refresh Token
         */
 
-        var newRefreshToken = GenerateRefreshToken();
-        var newJwtToken = GenerateJwtToken(user);
+        var newRefreshToken = _tokenService.GenerateRefreshToken();
+        var newJwtToken = _tokenService.GenerateJwtToken(user);
 
         stored.Revoked = true;
 
-        await SetRefreshTokenCookie(newRefreshToken, user.Username);
+        await _tokenService.SetRefreshTokenAsync(newRefreshToken, user.Username);
 
         return Ok(newJwtToken);
     }

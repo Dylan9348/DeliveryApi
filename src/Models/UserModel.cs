@@ -18,5 +18,5 @@ public class UserModel
     [Required]
     public UserRole Role { get; set; }
     
-    public int Points { get; set; }
+    public int Points { get; set; } = 0;
 }
