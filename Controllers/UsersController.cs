@@ -122,7 +122,11 @@ public class UsersController(Context database) : Controller
     [HttpPost("refresh")]
     public async Task<IActionResult> Refresh()
     {
-        if (Request.Cookies.TryGetValue("refreshToken", out var refreshToken))
+        /*
+            validate refresh token
+        */
+
+        if (!Request.Cookies.TryGetValue("refreshToken", out var refreshToken))
             return Unauthorized("No refresh token");
 
         var stored = await _database.RefreshTokens.FirstOrDefaultAsync(r => r.Token == refreshToken);
@@ -130,7 +134,7 @@ public class UsersController(Context database) : Controller
         if (stored is null || stored.Expiration < DateTime.UtcNow)
             return Unauthorized("Invalid or expired refresh token");
 
-        if (!stored.Revoked)
+        if (stored.Revoked)
             return Unauthorized("Revoked");
 
         var user = await _database.Users.FirstOrDefaultAsync(u => u.Username == stored.UsernameTarget);
@@ -138,8 +142,16 @@ public class UsersController(Context database) : Controller
         if (user is null)
             return Unauthorized("Invalid");
 
+        /*
+            return Jwt and a new Refresh Token
+        */
+
         var newRefreshToken = GenerateRefreshToken();
         var newJwtToken = GenerateJwtToken(user);
+
+        stored.Revoked = true;
+
+        await SetRefreshTokenCookie(newRefreshToken, user.Username);
 
         return Ok(newJwtToken);
     }
@@ -156,7 +168,7 @@ public class UsersController(Context database) : Controller
 
     [HttpDelete]
     [Authorize]
-    public async Task<IActionResult> DeleteUser(string password)
+    public async Task<IActionResult> DeleteUser([FromBody] string password)
     {
         var claimUserId = User.FindFirst(JwtRegisteredClaimNames.Sub);
 
@@ -178,7 +190,7 @@ public class UsersController(Context database) : Controller
         if (!isPasswordCorrect)
             return Unauthorized();
 
-        _database.Users.Remove(user!);
+        _database.Users.Remove(user);
         await _database.SaveChangesAsync();
 
         return NoContent();

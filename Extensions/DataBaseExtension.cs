@@ -1,4 +1,6 @@
 
+using Microsoft.EntityFrameworkCore;
+
 using DeliveryApi.DataBase;
 
 namespace DeliveryApi.Extensions;
