@@ -104,19 +104,9 @@ public class UsersController(Context database, ITokenService tokenService) : Con
         return Ok(newJwtToken);
     }
 
-    [HttpGet]
-    public async Task<IActionResult> ListUsers()
-    {
-        var titles = await _database.Users
-            .Select(u => u.Username)
-            .ToListAsync();
-        
-        return Ok(titles);
-    }
-
-    [HttpDelete]
+    [HttpDelete("self")]
     [Authorize]
-    public async Task<IActionResult> DeleteUser([FromBody] string password)
+    public async Task<IActionResult> Delete([FromBody] string password)
     {
         var claimUserId = User.FindFirst(JwtRegisteredClaimNames.Sub);
 
@@ -142,5 +132,100 @@ public class UsersController(Context database, ITokenService tokenService) : Con
         await _database.SaveChangesAsync();
 
         return NoContent();
+    }
+
+    [Authorize(Roles = "Admin,Owner")]
+    [HttpGet]
+    public async Task<IActionResult> GetAllUsers()
+    {
+        var users = await _database.Users
+            .Select(u => u.Username)
+            .ToListAsync();
+        return Ok(users);
+    }
+
+    [Authorize(Roles = "Admin,Owner")]
+    [HttpPost("suspend")]
+    public async Task<IActionResult> SuspendAccount(SuspendAccountRequest req)
+    {
+        var claimUserId = User.FindFirst(JwtRegisteredClaimNames.Sub);
+
+        if (claimUserId is null)
+            return Unauthorized();
+        
+        var stringUserId = claimUserId.Value;
+        var client = await _database.Users.FirstOrDefaultAsync(u => u.Id.ToString() == stringUserId);
+
+        var user = await _database.Users.FirstOrDefaultAsync(u => u.Username == req.Username);
+
+        if (user is null)
+            return NotFound(req.Username);
+        
+        if (client is null || (user.Role == UserRole.Admin && client.Role != UserRole.Owner) || user.Role == UserRole.Owner)
+            return Unauthorized();
+
+        DateTime until;
+
+        if (user.SuspendedUntil is null || user.SuspendedUntil < DateTime.UtcNow)
+            until = DateTime.UtcNow;
+        else
+            until = (DateTime)user.SuspendedUntil;
+
+        user.SuspendedUntil = until
+            .AddDays(req.Days)
+            .AddHours(req.Hours);
+
+        await _database.SaveChangesAsync();
+
+        return Ok();
+    }
+
+    [Authorize(Roles = "Admin,Owner")]
+    [HttpDelete("suspend")]
+    public async Task<IActionResult> UnsuspendAccount(string username)
+    {
+        var user = await _database.Users.FirstOrDefaultAsync(u => u.Username == username);
+
+        if (user is null)
+            return NotFound(username);
+        
+        user.SuspendedUntil = null;
+
+        return Ok();
+    }
+
+    [Authorize(Roles = "Admin,Owner")]
+    [HttpPost("roles")]
+    public async Task<IActionResult> AssignRole(AssignRoleRequest req)
+    {
+        var user = await _database.Users.FirstOrDefaultAsync(u => u.Username == req.Username);
+        
+        if (user is null)
+            return NotFound(req.Username);
+
+        if (!Enum.TryParse(typeof(UserRole), req.Role, out var obj) || obj is not UserRole role)
+            return BadRequest();
+
+        if (role == UserRole.Owner || (role == UserRole.Admin && User.IsInRole("Admin")))
+            return Forbid();
+        
+        user.Role = role;
+        await _database.SaveChangesAsync();
+
+        return Ok();
+    }
+
+    [Authorize(Roles = "Owner")]
+    [HttpDelete]
+    public async Task<IActionResult> DeleteAccount([FromBody] string username)
+    {
+        var user = await _database.Users.FirstOrDefaultAsync(u => u.Username == username);
+
+        if (user is null)
+            return NotFound(username);
+        
+        _database.Users.Remove(user);
+        await _database.SaveChangesAsync();
+        return Ok();
     }
 }
