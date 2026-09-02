@@ -1,12 +1,11 @@
-
 using System.IdentityModel.Tokens.Jwt;
+using DeliveryApi.DataBase;
+using DeliveryApi.Models;
+using DeliveryApi.Models.RequestModels;
+using DeliveryApi.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-
-using DeliveryApi.DataBase;
-using DeliveryApi.Models;
-using DeliveryApi.Services;
 
 namespace DeliveryApi.Controllers;
 
@@ -20,24 +19,20 @@ public class UsersController(Context database, ITokenService tokenService) : Con
     [HttpPost("register")]
     public async Task<IActionResult> Register(UserReq req)
     {
-        var pw_hash = BCrypt.Net.BCrypt.HashPassword(req.Password);
+        var passwordhash = BCrypt.Net.BCrypt.HashPassword(req.Password);
         var user = new UserModel
         {
-            Username    = req.Username,
-            Password    = pw_hash,
-            Role        = UserRole.Client,
-            Points      = 0
+            Username = req.Username,
+            Password = passwordhash,
+            Role = UserRole.Client,
+            Points = 0,
         };
 
         var userAlreadyTaken = await _database.Users.AnyAsync(u => u.Username == req.Username);
 
         if (userAlreadyTaken)
         {
-            return Conflict(new Dictionary<string, string>()
-                {
-                    {"body", "username already taken"},
-                    {"field", "username"}
-                });
+            return Conflict();
         }
 
         _database.Users.Add(user);
@@ -53,12 +48,12 @@ public class UsersController(Context database, ITokenService tokenService) : Con
 
         if (user is null)
             return NotFound();
-        
+
         var isPasswordCorrect = BCrypt.Net.BCrypt.Verify(req.Password, user.Password);
 
         if (!isPasswordCorrect)
             return Unauthorized();
-    
+
         var token = _tokenService.GenerateJwtToken(user);
         var refreshToken = _tokenService.GenerateRefreshToken();
 
@@ -77,7 +72,9 @@ public class UsersController(Context database, ITokenService tokenService) : Con
         if (!Request.Cookies.TryGetValue("refreshToken", out var refreshToken))
             return Unauthorized("No refresh token");
 
-        var stored = await _database.RefreshTokens.FirstOrDefaultAsync(r => r.Token == refreshToken);
+        var stored = await _database.RefreshTokens.FirstOrDefaultAsync(r =>
+            r.Token == refreshToken
+        );
 
         if (stored is null || stored.Expiration < DateTime.UtcNow)
             return Unauthorized("Invalid or expired refresh token");
@@ -85,7 +82,9 @@ public class UsersController(Context database, ITokenService tokenService) : Con
         if (stored.Revoked)
             return Unauthorized("Revoked");
 
-        var user = await _database.Users.FirstOrDefaultAsync(u => u.Username == stored.UsernameTarget);
+        var user = await _database.Users.FirstOrDefaultAsync(u =>
+            u.Username == stored.UsernameTarget
+        );
 
         if (user is null)
             return Unauthorized("Invalid");
@@ -112,13 +111,13 @@ public class UsersController(Context database, ITokenService tokenService) : Con
 
         if (claimUserId is null)
             return Unauthorized();
-        
+
         var stringUserId = claimUserId.Value;
 
         if (!Guid.TryParse(stringUserId, out Guid userId))
-            return Ok();
-        
-        var user = await _database.Users.FirstOrDefaultAsync(u => u.Id == userId);
+            return Unauthorized();
+
+        var user = await _database.Users.FindAsync(userId);
 
         if (user is null)
             return NotFound("User not found.");
@@ -126,7 +125,7 @@ public class UsersController(Context database, ITokenService tokenService) : Con
         var isPasswordCorrect = BCrypt.Net.BCrypt.Verify(password, user.Password);
 
         if (!isPasswordCorrect)
-            return Unauthorized();
+            return Unauthorized("Incorrect password.");
 
         _database.Users.Remove(user);
         await _database.SaveChangesAsync();
@@ -138,9 +137,7 @@ public class UsersController(Context database, ITokenService tokenService) : Con
     [HttpGet]
     public async Task<IActionResult> GetAllUsers()
     {
-        var users = await _database.Users
-            .Select(u => u.Username)
-            .ToListAsync();
+        var users = await _database.Users.Select(u => u.Username).ToListAsync();
         return Ok(users);
     }
 
@@ -152,16 +149,22 @@ public class UsersController(Context database, ITokenService tokenService) : Con
 
         if (claimUserId is null)
             return Unauthorized();
-        
+
         var stringUserId = claimUserId.Value;
-        var client = await _database.Users.FirstOrDefaultAsync(u => u.Id.ToString() == stringUserId);
+        var client = await _database.Users.FirstOrDefaultAsync(u =>
+            u.Id.ToString() == stringUserId
+        );
 
         var user = await _database.Users.FirstOrDefaultAsync(u => u.Username == req.Username);
 
         if (user is null)
             return NotFound(req.Username);
-        
-        if (client is null || (user.Role == UserRole.Admin && client.Role != UserRole.Owner) || user.Role == UserRole.Owner)
+
+        if (
+            client is null
+            || (user.Role == UserRole.Admin && client.Role != UserRole.Owner)
+            || user.Role == UserRole.Owner
+        )
             return Unauthorized();
 
         DateTime until;
@@ -171,9 +174,7 @@ public class UsersController(Context database, ITokenService tokenService) : Con
         else
             until = (DateTime)user.SuspendedUntil;
 
-        user.SuspendedUntil = until
-            .AddDays(req.Days)
-            .AddHours(req.Hours);
+        user.SuspendedUntil = until.AddDays(req.Days).AddHours(req.Hours);
 
         await _database.SaveChangesAsync();
 
@@ -188,7 +189,7 @@ public class UsersController(Context database, ITokenService tokenService) : Con
 
         if (user is null)
             return NotFound(username);
-        
+
         user.SuspendedUntil = null;
 
         return Ok();
@@ -199,7 +200,7 @@ public class UsersController(Context database, ITokenService tokenService) : Con
     public async Task<IActionResult> AssignRole(AssignRoleRequest req)
     {
         var user = await _database.Users.FirstOrDefaultAsync(u => u.Username == req.Username);
-        
+
         if (user is null)
             return NotFound(req.Username);
 
@@ -208,7 +209,7 @@ public class UsersController(Context database, ITokenService tokenService) : Con
 
         if (role == UserRole.Owner || (role == UserRole.Admin && User.IsInRole("Admin")))
             return Forbid();
-        
+
         user.Role = role;
         await _database.SaveChangesAsync();
 
@@ -223,7 +224,7 @@ public class UsersController(Context database, ITokenService tokenService) : Con
 
         if (user is null)
             return NotFound(username);
-        
+
         _database.Users.Remove(user);
         await _database.SaveChangesAsync();
         return Ok();

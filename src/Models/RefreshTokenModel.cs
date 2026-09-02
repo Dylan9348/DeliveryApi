@@ -1,4 +1,3 @@
-
 namespace DeliveryApi.Models;
 
 public class RefreshToken

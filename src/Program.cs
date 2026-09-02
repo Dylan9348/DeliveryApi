@@ -1,4 +1,3 @@
-
 using DeliveryApi.Extensions;
 
 var builder = WebApplication.CreateBuilder(args);

@@ -1,4 +1,3 @@
-
 using System.ComponentModel.DataAnnotations;
 
 namespace DeliveryApi.Models;
@@ -17,7 +16,7 @@ public class UserModel
 
     [Required]
     public UserRole Role { get; set; }
-    
+
     public int Points { get; set; } = 0;
 
     public DateTime? SuspendedUntil { get; set; } = null;

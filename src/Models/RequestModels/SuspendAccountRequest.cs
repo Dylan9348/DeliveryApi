@@ -1,5 +1,4 @@
-
-namespace DeliveryApi.Models;
+namespace DeliveryApi.Models.RequestModels;
 
 public class SuspendAccountRequest
 {

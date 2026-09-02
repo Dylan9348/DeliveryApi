@@ -1,7 +1,6 @@
-
 using System.ComponentModel.DataAnnotations;
 
-namespace DeliveryApi.Models;
+namespace DeliveryApi.Models.RequestModels;
 
 public class ProductReq
 {
@@ -16,15 +15,4 @@ public class ProductReq
     [Required]
     [Range(0, double.MaxValue)]
     public double Price { get; set; }
-
-    public Product ToProduct()
-    {
-        return new Product
-        {
-            Name = Name,
-            Description = Description,
-            Category = Category,
-            Price = Price
-        };
-    }
 }
