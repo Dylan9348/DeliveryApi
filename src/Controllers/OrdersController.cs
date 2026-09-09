@@ -7,7 +7,6 @@ using DeliveryApi.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using DeliveryApi.Models;
 namespace DeliveryApi.Controllers;
 
 [ApiController]
