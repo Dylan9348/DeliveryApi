@@ -1,4 +1,3 @@
-
 namespace DeliveryApi.Models;
 
 public enum UserRole
@@ -6,5 +5,5 @@ public enum UserRole
     Client,
     Delivery,
     Admin,
-    Owner
+    Owner,
 }

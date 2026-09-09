@@ -1,10 +1,8 @@
-
-using Microsoft.IdentityModel.Tokens;
+using System.Text;
+using DeliveryApi.DataBase;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
-using System.Text;
-
-using DeliveryApi.DataBase;
+using Microsoft.IdentityModel.Tokens;
 
 namespace DeliveryApi.Extensions;
 
@@ -12,7 +10,8 @@ public static class JwtExtension
 {
     public static IServiceCollection AddJwtAuthentication(this IServiceCollection services)
     {
-        services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+        services
+            .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             .AddJwtBearer(options =>
             {
                 options.MapInboundClaims = false;
@@ -28,25 +27,24 @@ public static class JwtExtension
                     ValidAudience = "clients",
                     IssuerSigningKey = new SymmetricSecurityKey(
                         Encoding.UTF8.GetBytes(Environment.GetEnvironmentVariable("KEY_TOKEN_GEN")!)
-                    )
+                    ),
                 };
 
                 options.Events = new JwtBearerEvents
                 {
                     OnTokenValidated = async context =>
                     {
-
                         var userIdClaim = context.Principal?.FindFirst("sub")?.Value;
-                        
+
                         if (userIdClaim is null)
                         {
                             context.Fail("Missing user id claim.");
                             return;
                         }
 
-                        var database = context.HttpContext.RequestServices
-                            .GetRequiredService<Context>();
-                        
+                        var database =
+                            context.HttpContext.RequestServices.GetRequiredService<Context>();
+
                         if (!Guid.TryParse(userIdClaim, out var userId))
                         {
                             context.Fail("Invalid user id claim");
@@ -72,10 +70,10 @@ public static class JwtExtension
                             user.SuspendedUntil = null;
                             await database.SaveChangesAsync();
                         }
-                    }
+                    },
                 };
             });
 
         return services;
     }
-} 
+}

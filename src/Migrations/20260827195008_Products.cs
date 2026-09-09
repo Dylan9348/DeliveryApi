@@ -15,7 +15,8 @@ namespace DeliveryApi.Migrations
                 name: "SuspendedUntil",
                 table: "Users",
                 type: "timestamp with time zone",
-                nullable: true);
+                nullable: true
+            );
 
             migrationBuilder.CreateTable(
                 name: "Products",
@@ -25,23 +26,21 @@ namespace DeliveryApi.Migrations
                     Name = table.Column<string>(type: "text", nullable: false),
                     Description = table.Column<string>(type: "text", nullable: false),
                     Category = table.Column<string>(type: "text", nullable: false),
-                    Price = table.Column<double>(type: "double precision", nullable: false)
+                    Price = table.Column<double>(type: "double precision", nullable: false),
                 },
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_Products", x => x.Id);
-                });
+                }
+            );
         }
 
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.DropTable(
-                name: "Products");
+            migrationBuilder.DropTable(name: "Products");
 
-            migrationBuilder.DropColumn(
-                name: "SuspendedUntil",
-                table: "Users");
+            migrationBuilder.DropColumn(name: "SuspendedUntil", table: "Users");
         }
     }
 }

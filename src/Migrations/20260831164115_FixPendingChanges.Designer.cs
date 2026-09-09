@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using DeliveryApi.DataBase;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -12,9 +13,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace DeliveryApi.Migrations
 {
     [DbContext(typeof(Context))]
-    partial class ContextModelSnapshot : ModelSnapshot
+    [Migration("20260831164115_FixPendingChanges")]
+    partial class FixPendingChanges
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -70,12 +73,6 @@ namespace DeliveryApi.Migrations
                         .HasColumnType("text");
 
                     b.Property<bool>("Finished")
-                        .HasColumnType("boolean");
-
-                    b.Property<bool>("HasDelivery")
-                        .HasColumnType("boolean");
-
-                    b.Property<bool>("IsAtHome")
                         .HasColumnType("boolean");
 
                     b.PrimitiveCollection<Guid[]>("ProductsId")

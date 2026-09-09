@@ -1,7 +1,6 @@
-
 using System.ComponentModel.DataAnnotations;
 
-namespace DeliveryApi.Models;
+namespace DeliveryApi.Models.RequestModels;
 
 public class UserReq
 {
