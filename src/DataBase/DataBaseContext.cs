@@ -20,6 +20,5 @@ public class Context(DbContextOptions<Context> context) : DbContext(context)
             
         modelBuilder.Entity<Order>()
             .ComplexProperty(o => o.Delivery, d => d.IsRequired(false));
-
     }
 }

@@ -6,7 +6,6 @@ namespace DeliveryApi.Services;
 public interface IOrderService
 {
     Task RegisterOrder(UserDto client, Product[] products, Address? address, string code);
-    Task<double> QuotePrice(Product product);
-    Task<double> QuoteAllPrices(Product[] products);
-    //Task AddTokens(Order order);
+    Task<double> QuoteAllPricesUsingPoints(Guid[] productsId, int points);
+    Task AddPoints(Guid clientId, Guid[] productsId);
 }

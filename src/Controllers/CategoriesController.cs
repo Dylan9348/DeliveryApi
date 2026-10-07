@@ -55,13 +55,15 @@ public class CategoriesController(Context database) : Controller
         category.Name = req.Name;
 
         await _database
-            .Products.Where(p => p.Name == category.Name)
+            .Products.Where(p => p.Name == name)
             .ForEachAsync(
                 (p) =>
                 {
                     p.Category = category;
                 }
             );
+        
+        await _database.SaveChangesAsync();
 
         return Ok();
     }

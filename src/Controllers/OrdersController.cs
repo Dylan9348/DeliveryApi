@@ -11,10 +11,12 @@ namespace DeliveryApi.Controllers;
 
 [ApiController]
 [Route("orders")]
-public class OrdersController(Context database, IOrderService orderService) : Controller
+public class OrdersController(Context database, IOrderService orderService, IDiscountsService discountsService, IPointsService pointsService) : Controller
 {
     private readonly Context _database = database;
+    private readonly IDiscountsService _discountsService = discountsService;
     private readonly IOrderService _orderService = orderService;
+    private readonly IPointsService _pointsService = pointsService;
 
     [HttpPost]
     [Authorize]
@@ -41,12 +43,34 @@ public class OrdersController(Context database, IOrderService orderService) : Co
 
         if (client is null)
             return Unauthorized();
+        
+        if (client.Points < req.Points)
+            return Forbid("insufficient points");
 
         var clientDto = new UserDto { UserId = client.Id, Username = client.Username };
         var code = RandomNumberGenerator.GetString("0123456789", 6);
 
         await _orderService.RegisterOrder(clientDto, products, req.ClientAddress, code);
-        var totalCost = await _orderService.QuoteAllPrices(products);
+        
+        var productsId = products.Select(p => p.Id);
+
+        if (client.Points <= 0)
+            await _orderService.AddPoints(client.Id, [.. productsId]);
+
+        var quotePrice = await _discountsService.CalcProductsDiscountAsync([.. productsId]);
+
+        var maxPoints = _discountsService.CalcMaxPointDiscount(quotePrice);
+
+        if (maxPoints < req.Points)
+            return BadRequest($"max points that you can use for this order: {maxPoints}");
+
+        var totalCost = quotePrice;
+        
+        if (req.Points is int points && points > 0)
+        {
+            totalCost = _discountsService.CalcPointsDiscount(req.Points ?? 0, quotePrice);
+            _pointsService.DiscountPointsAsync(points, client.Id);
+        }
 
         return Ok(new object[] { totalCost, code });
     }
@@ -140,20 +164,6 @@ public class OrdersController(Context database, IOrderService orderService) : Co
 
         await _database.SaveChangesAsync();
 
-        return Ok();
-    }
-
-    [HttpDelete]
-    public async Task<IActionResult> ClearOrders()
-    {
-        var orders = await _database.Orders.ToListAsync();
-
-        foreach (var order in orders)
-        {
-            _database.Remove(order);
-        }
-
-        await _database.SaveChangesAsync();
         return Ok();
     }
 }

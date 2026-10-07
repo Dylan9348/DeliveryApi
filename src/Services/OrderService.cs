@@ -4,9 +4,11 @@ using DeliveryApi.Models.DtoModels;
 
 namespace DeliveryApi.Services;
 
-public class OrderService(Context database) : IOrderService
+public class OrderService(Context database, IDiscountsService discountsService, IPointsService pointsService) : IOrderService
 {
     private readonly Context _database = database;
+    private readonly IDiscountsService _discountsService = discountsService;
+    private readonly IPointsService _pointsService = pointsService;
 
     public async Task RegisterOrder(
         UserDto client,
@@ -31,25 +33,20 @@ public class OrderService(Context database) : IOrderService
         _database.Add(order);
         await _database.SaveChangesAsync();
     }
-
-    public async Task<double> QuotePrice(Product product)
+    
+    public async Task<double> QuoteAllPricesUsingPoints(Guid[] productsId, int points)
     {
-        return product.Price;
-    }
+        var priceWithDiscount = await _discountsService.CalcProductsDiscountAsync(productsId);
 
-    public async Task<double> QuoteAllPrices(Product[] products)
-    {
-        var finalPrice = 0.0;
-        foreach (var product in products)
-            finalPrice += await QuotePrice(product);
+        var finalPrice = _discountsService.CalcPointsDiscount(points, priceWithDiscount);
+
         return finalPrice;
     }
 
-    /*
-    public async Task AddPoints(Order order)
+    public async Task AddPoints(Guid clientId, Guid[] productsId)
     {
-        var client = await _database.Users.FindAsync(order.Client.Id);
-        var delivery = await _database.Users.FindAsync(order.Delivery!.Id);
+        var orderPrice = await _discountsService.CalcProductsDiscountAsync(productsId);
+
+        await _pointsService.AddPointsBalanceAsync((int) orderPrice * 5, clientId);
     }
-    */
 }
